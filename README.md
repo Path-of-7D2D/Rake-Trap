@@ -1,5 +1,7 @@
 # Rake Trap
 
+![Rake Trap](assets/header.png)
+
 Rake Trap adds a cheap early-game trap to 7 Days To Die V3.0.
 
 ## Requirements
@@ -24,6 +26,7 @@ C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1A-RakeTrap
 ## What It Adds
 
 - A craftable `Rake Trap` block.
+![Rake Trap](assets/thumbnail.png)
 - Recipe: `1x Forged Iron` and `20x Wood`.
 - The trap triggers when an entity steps on it.
 - The rake snaps up and then returns to armed position after 4 seconds.
