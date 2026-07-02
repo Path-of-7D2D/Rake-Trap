@@ -1,0 +1,4 @@
+Key,File,Type,UsedInMainMenu,NoTranslate,english
+rakeTrap,blocks,Block,,,Rake Trap
+rakeTrapDesc,blocks,Block,,,A cheap rake trap. When stepped on, the metal head stays down and the handle snaps upward, doing light damage with a strong chance to knock the target down.
+
