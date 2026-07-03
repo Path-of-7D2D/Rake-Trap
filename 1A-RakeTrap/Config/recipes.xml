@@ -6,7 +6,11 @@
 			<ingredient name="resourceForgedIron" count="1" />
 			<ingredient name="resourceWood" count="20" />
 		</recipe>
+		<recipe name="upgradedRakeTrap" count="1" craft_time="6" craft_area="workbench" tags="packMuleCrafting">
+			<ingredient name="rakeTrap" count="1" />
+			<ingredient name="resourceNail" count="4" />
+			<ingredient name="resourceForgedIron" count="2" />
+		</recipe>
 	</append>
 
 </configs>
-

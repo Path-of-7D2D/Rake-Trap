@@ -15,6 +15,8 @@ namespace RakeTrap
         private const string PropBrushOffChance = "BrushOffChance";
         private const string PropRearmSeconds = "RearmSeconds";
         private const string PropAnimationTrigger = "AnimationTrigger";
+        private const string PropTrapDamage = "Damage";
+        private const string PropArmorPierceFraction = "ArmorPierceFraction";
 
         private static readonly Vector3 ModelBoundsCenter = new Vector3(0f, 0.105f, -0.9f);
         private static readonly Vector3 ModelBoundsSize = new Vector3(0.6f, 0.25f, 1.85f);
@@ -36,7 +38,7 @@ namespace RakeTrap
         public override void Init()
         {
             base.Init();
-            ParseInt(Block.PropDamage, ref damage);
+            ParseInt(PropTrapDamage, ref damage);
             ParseEnum(PropDamageType, ref damageType);
             ParseChance(PropKnockdownChance, ref knockdownChance);
             ParseChance(PropBrushOffChance, ref brushOffChance);
@@ -175,7 +177,8 @@ namespace RakeTrap
 
         private void ApplyTrapEffect(WorldBase world, Vector3i blockPos, BlockValue blockValue, EntityAlive target)
         {
-            if (damage > 0)
+            int trapDamage = GetTrapDamage(blockValue);
+            if (trapDamage > 0)
             {
                 Vector3 direction = target.position - new Vector3(blockPos.x + 0.5f, blockPos.y + 0.15f, blockPos.z + 0.5f);
                 if (direction.sqrMagnitude < 0.001f)
@@ -183,12 +186,19 @@ namespace RakeTrap
                     direction = Vector3.up;
                 }
 
-                DamageSourceEntity source = new DamageSourceEntity(EnumDamageSource.External, damageType, -1, direction.normalized)
+                int armorPierceDamage = Mathf.Clamp(Mathf.RoundToInt(trapDamage * GetArmorPierceFraction(blockValue)), 0, trapDamage);
+                int normalDamage = trapDamage - armorPierceDamage;
+                if (normalDamage > 0)
                 {
-                    AttackingItem = blockValue.ToItemValue(),
-                    BlockPosition = blockPos
-                };
-                target.DamageEntity(source, damage, _criticalHit: false, 0.2f);
+                    DamageSourceEntity source = CreateDamageSource(blockValue, blockPos, direction, EnumDamageSource.External, damageType);
+                    target.DamageEntity(source, normalDamage, _criticalHit: false, 0.2f);
+                }
+
+                if (armorPierceDamage > 0)
+                {
+                    DamageSourceEntity pierceSource = CreateDamageSource(blockValue, blockPos, direction, EnumDamageSource.Internal, EnumDamageTypes.Piercing);
+                    target.DamageEntity(pierceSource, armorPierceDamage, _criticalHit: false, 0f);
+                }
             }
 
             if (target.Buffs == null)
@@ -201,6 +211,50 @@ namespace RakeTrap
             {
                 target.Buffs.AddBuff("buffInjuryKnockdown01", blockPos);
             }
+        }
+
+        private int GetTrapDamage(BlockValue blockValue)
+        {
+            int trapDamage = damage;
+            Block block = blockValue.Block;
+            if (block != null &&
+                block.Properties != null &&
+                block.Properties.Values.TryGetValue(PropTrapDamage, out string raw) &&
+                int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed))
+            {
+                trapDamage = parsed;
+            }
+
+            return trapDamage;
+        }
+
+        private float GetArmorPierceFraction(BlockValue blockValue)
+        {
+            float fraction = 0f;
+            Block block = blockValue.Block;
+            if (block != null &&
+                block.Properties != null &&
+                block.Properties.Values.TryGetValue(PropArmorPierceFraction, out string raw) &&
+                float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed))
+            {
+                fraction = parsed;
+            }
+
+            return Mathf.Clamp01(fraction);
+        }
+
+        private DamageSourceEntity CreateDamageSource(
+            BlockValue blockValue,
+            Vector3i blockPos,
+            Vector3 direction,
+            EnumDamageSource source,
+            EnumDamageTypes type)
+        {
+            return new DamageSourceEntity(source, type, -1, direction.normalized)
+            {
+                AttackingItem = blockValue.ToItemValue(),
+                BlockPosition = blockPos
+            };
         }
 
         private void PlayTriggerSound(WorldBase world, Vector3i blockPos, EntityAlive target)

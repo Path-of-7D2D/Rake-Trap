@@ -25,14 +25,17 @@ C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\1A-RakeTrap
 
 ## What It Adds
 
-- A craftable `Rake Trap` block.
+- Craftable `Rake Trap` and `Spiked Rake Trap` blocks.
 ![Rake Trap](assets/thumbnail.png)
 - Recipe: `1x Forged Iron` and `20x Wood`.
+- Spiked recipe: `1x Rake Trap`, `4x Nails`, and `2x Forged Iron` at a workbench.
 - The trap triggers when an entity steps on it.
 - The rake snaps up and then returns to armed position after 4 seconds.
-- The hit deals light bashing damage and has a high chance to apply the vanilla knockdown buff.
+- The normal hit deals light bashing damage, while the spiked trap deals 60 total damage.
+- The spiked trap converts 15% of its hit into armor-piercing damage.
+- Both traps have a high chance to apply the vanilla knockdown buff.
 - A small brush-off chance lets the target take the light hit without being knocked down.
-- The trap has 100 durability and can be destroyed by players or zombies.
+- Both traps have 100 durability and can be destroyed by players or zombies.
 - Placed rake traps can be picked up and returned to your inventory.
 
 ## Compatibility Notes

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEditor.Animations;
@@ -7,17 +8,28 @@ using UnityEngine;
 public static class BuildRakeTrapBundle
 {
     private const string PrefabPath = "Assets/RakeTrap/Prefabs/RakeTrapPrefab.prefab";
+    private const string UpgradedPrefabPath = "Assets/RakeTrap/Prefabs/UpgradedRakeTrapPrefab.prefab";
     private const string SourceModelPath = "Assets/RakeTrap/SourceAssets/Rake001.fbx";
+    private const string UpgradedSourcePrefabPath = "Assets/RakeTrap/SourceAssets/Upgraded Rake/RakeUpdated.prefab";
+    private const string UpgradedMaterialPath = "Assets/RakeTrap/SourceAssets/Upgraded Rake/Materials/Rake002.mat";
     private const string MaterialsDir = "Assets/RakeTrap/Materials";
     private const string AnimationsDir = "Assets/RakeTrap/Animations";
     private const string BundleName = "raketrap.unity3d";
     private const string AnimationTrigger = "Spring";
     private const string SourceHandleName = "RakeHandle";
     private const string SourceHeadName = "RakeHead.001";
+    private const string UpgradedSourceHandleName = "RakeHandle.289";
+    private const string UpgradedSourceHeadName = "RakeHead.001";
     private const float GroundClearance = 0.02f;
     private const float MinColliderHeight = 0.25f;
     private const float ArmedHandleAngle = -90f;
     private const float SprungHandleAngle = 0f;
+
+    private static readonly string[] BuiltPrefabNames =
+    {
+        "RakeTrapPrefab.prefab",
+        "UpgradedRakeTrapPrefab.prefab"
+    };
 
     [MenuItem("Rake Trap/Build AssetBundle")]
     public static void BuildFromMenu()
@@ -65,62 +77,28 @@ public static class BuildRakeTrapBundle
 
         try
         {
-            GameObject prefab = null;
+            Dictionary<string, GameObject> prefabs = new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
             foreach (string assetName in bundle.GetAllAssetNames())
             {
                 Debug.Log($"Bundle asset: {assetName}");
-                if (assetName.EndsWith("raketrapprefab.prefab", StringComparison.OrdinalIgnoreCase))
+                foreach (string prefabName in BuiltPrefabNames)
                 {
-                    prefab = bundle.LoadAsset<GameObject>(assetName);
+                    if (assetName.EndsWith(prefabName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        prefabs[prefabName] = bundle.LoadAsset<GameObject>(assetName);
+                    }
                 }
             }
 
-            if (prefab == null)
+            foreach (string prefabName in BuiltPrefabNames)
             {
-                throw new InvalidOperationException("Built bundle does not contain RakeTrapPrefab.prefab");
+                if (!prefabs.TryGetValue(prefabName, out GameObject prefab) || prefab == null)
+                {
+                    throw new InvalidOperationException($"Built bundle does not contain {prefabName}");
+                }
+
+                ValidatePrefab(prefab, prefabName);
             }
-
-            AssertTransform(prefab.transform, "Mesh");
-            AssertTransform(prefab.transform, "Mesh/HandlePivot");
-            AssertTransform(prefab.transform, "Mesh/HandlePivot/RakeHandle");
-            AssertTransform(prefab.transform, "Mesh/HandlePivot/RakeHead/RakeHead.001");
-
-            if (prefab.GetComponent<Animator>() == null)
-            {
-                throw new InvalidOperationException("RakeTrapPrefab root is missing its Animator.");
-            }
-
-            BoxCollider rootCollider = prefab.GetComponent<BoxCollider>();
-            if (rootCollider == null)
-            {
-                throw new InvalidOperationException("RakeTrapPrefab root is missing its targeting BoxCollider.");
-            }
-
-            Debug.Log($"Rake trap collider center={rootCollider.center} size={rootCollider.size}");
-            if (rootCollider.size.y < MinColliderHeight - 0.01f || rootCollider.size.z < 1.0f)
-            {
-                throw new InvalidOperationException($"RakeTrapPrefab collider looks too small: {rootCollider.size}");
-            }
-
-            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
-            if (renderers.Length == 0)
-            {
-                throw new InvalidOperationException("RakeTrapPrefab has no renderers.");
-            }
-
-            Bounds bounds = renderers[0].bounds;
-            for (int i = 1; i < renderers.Length; i++)
-            {
-                bounds.Encapsulate(renderers[i].bounds);
-            }
-
-            Debug.Log($"Rake trap renderers={renderers.Length}, bounds center={bounds.center}, size={bounds.size}");
-            if (bounds.size.y < 0.05f || bounds.size.z < 1.0f)
-            {
-                throw new InvalidOperationException($"RakeTrapPrefab bounds look too small: {bounds.size}");
-            }
-
-            ValidateSpringClearance(prefab);
 
             Debug.Log("Rake trap bundle validation passed.");
         }
@@ -167,17 +145,55 @@ public static class BuildRakeTrapBundle
     {
         EnsureFolders();
         ConfigureSourceTextures();
-        ConfigureModelImport(SourceModelPath);
-        AssetDatabase.ImportAsset(SourceModelPath, ImportAssetOptions.ForceUpdate);
-
+        RuntimeAnimatorController controller = EnsureAnimatorController();
         Material rakeMaterial = MakeRakeMaterial();
-        GameObject sourceModel = AssetDatabase.LoadAssetAtPath<GameObject>(SourceModelPath);
-        if (sourceModel == null)
+        Material upgradedMaterial = LoadSourceMaterial(UpgradedMaterialPath);
+
+        EnsureRakePrefab(
+            PrefabPath,
+            "RakeTrapPrefab",
+            SourceModelPath,
+            SourceHandleName,
+            SourceHeadName,
+            rakeMaterial,
+            controller);
+
+        EnsureRakePrefab(
+            UpgradedPrefabPath,
+            "UpgradedRakeTrapPrefab",
+            UpgradedSourcePrefabPath,
+            UpgradedSourceHandleName,
+            UpgradedSourceHeadName,
+            upgradedMaterial,
+            controller);
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+    }
+
+    private static void EnsureRakePrefab(
+        string prefabPath,
+        string prefabName,
+        string sourceAssetPath,
+        string sourceHandleName,
+        string sourceHeadName,
+        Material material,
+        RuntimeAnimatorController controller)
+    {
+        if (sourceAssetPath.EndsWith(".fbx", StringComparison.OrdinalIgnoreCase))
         {
-            throw new FileNotFoundException($"Missing source model at {SourceModelPath}");
+            ConfigureModelImport(sourceAssetPath);
         }
 
-        GameObject root = new GameObject("RakeTrapPrefab");
+        AssetDatabase.ImportAsset(sourceAssetPath, ImportAssetOptions.ForceUpdate);
+
+        GameObject sourceModel = AssetDatabase.LoadAssetAtPath<GameObject>(sourceAssetPath);
+        if (sourceModel == null)
+        {
+            throw new FileNotFoundException($"Missing source model at {sourceAssetPath}");
+        }
+
+        GameObject root = new GameObject(prefabName);
         root.transform.localPosition = Vector3.zero;
         root.transform.localRotation = Quaternion.identity;
         root.transform.localScale = Vector3.one;
@@ -193,21 +209,21 @@ public static class BuildRakeTrapBundle
         head.transform.SetParent(pivot.transform, false);
 
         GameObject sourceRoot = UnityEngine.Object.Instantiate(sourceModel);
-        sourceRoot.name = "Rake001Source";
+        sourceRoot.name = prefabName + "Source";
         sourceRoot.transform.position = Vector3.zero;
         sourceRoot.transform.rotation = Quaternion.identity;
         sourceRoot.transform.localScale = Vector3.one;
 
-        Transform sourceHandle = FindRequiredChild(sourceRoot.transform, SourceHandleName);
-        Transform sourceHead = FindRequiredChild(sourceRoot.transform, SourceHeadName);
+        Transform sourceHandle = FindRequiredChild(sourceRoot.transform, sourceHandleName);
+        Transform sourceHead = FindRequiredChild(sourceRoot.transform, sourceHeadName);
         Bounds headBounds = GetRendererBounds(sourceHead);
 
         pivot.transform.localPosition = new Vector3(headBounds.center.x, headBounds.min.y, headBounds.min.z);
 
         sourceHead.SetParent(head.transform, true);
         sourceHandle.SetParent(pivot.transform, true);
-        ApplyMaterial(sourceHead, rakeMaterial);
-        ApplyMaterial(sourceHandle, rakeMaterial);
+        ApplyMaterial(sourceHead, material);
+        ApplyMaterial(sourceHandle, material);
 
         pivot.transform.localRotation = Quaternion.Euler(ArmedHandleAngle, 0f, 0f);
         Bounds armedBounds = GetRendererBounds(root.transform);
@@ -225,24 +241,21 @@ public static class BuildRakeTrapBundle
         targetingCollider.center = new Vector3(groundedBounds.center.x, colliderSize.y * 0.5f, groundedBounds.center.z);
 
         Animator animator = root.AddComponent<Animator>();
-        animator.runtimeAnimatorController = EnsureAnimatorController();
+        animator.runtimeAnimatorController = controller;
         animator.applyRootMotion = false;
         animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
 
-        PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+        PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
         UnityEngine.Object.DestroyImmediate(root);
 
-        AssetImporter importer = AssetImporter.GetAtPath(PrefabPath);
+        AssetImporter importer = AssetImporter.GetAtPath(prefabPath);
         if (importer == null)
         {
-            throw new InvalidOperationException($"Could not load prefab importer for {PrefabPath}");
+            throw new InvalidOperationException($"Could not load prefab importer for {prefabPath}");
         }
 
         importer.assetBundleName = BundleName;
         importer.SaveAndReimport();
-
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
     }
 
     private static RuntimeAnimatorController EnsureAnimatorController()
@@ -386,7 +399,55 @@ public static class BuildRakeTrapBundle
         }
     }
 
-    private static void ValidateSpringClearance(GameObject prefab)
+    private static void ValidatePrefab(GameObject prefab, string prefabName)
+    {
+        RequireTransform(prefab.transform, prefabName, "Mesh");
+        Transform pivot = RequireTransform(prefab.transform, prefabName, "Mesh/HandlePivot");
+        Renderer[] pivotRenderers = pivot.GetComponentsInChildren<Renderer>(true);
+        if (pivotRenderers.Length < 2)
+        {
+            throw new InvalidOperationException($"{prefabName} should have rake head and handle renderers under Mesh/HandlePivot.");
+        }
+
+        if (prefab.GetComponent<Animator>() == null)
+        {
+            throw new InvalidOperationException($"{prefabName} root is missing its Animator.");
+        }
+
+        BoxCollider rootCollider = prefab.GetComponent<BoxCollider>();
+        if (rootCollider == null)
+        {
+            throw new InvalidOperationException($"{prefabName} root is missing its targeting BoxCollider.");
+        }
+
+        Debug.Log($"{prefabName} collider center={rootCollider.center} size={rootCollider.size}");
+        if (rootCollider.size.y < MinColliderHeight - 0.01f || rootCollider.size.z < 1.0f)
+        {
+            throw new InvalidOperationException($"{prefabName} collider looks too small: {rootCollider.size}");
+        }
+
+        Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0)
+        {
+            throw new InvalidOperationException($"{prefabName} has no renderers.");
+        }
+
+        Bounds bounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            bounds.Encapsulate(renderers[i].bounds);
+        }
+
+        Debug.Log($"{prefabName} renderers={renderers.Length}, bounds center={bounds.center}, size={bounds.size}");
+        if (bounds.size.y < 0.05f || bounds.size.z < 1.0f)
+        {
+            throw new InvalidOperationException($"{prefabName} bounds look too small: {bounds.size}");
+        }
+
+        ValidateSpringClearance(prefab, prefabName);
+    }
+
+    private static void ValidateSpringClearance(GameObject prefab, string prefabName)
     {
         GameObject instance = UnityEngine.Object.Instantiate(prefab);
         try
@@ -394,7 +455,7 @@ public static class BuildRakeTrapBundle
             Transform pivot = instance.transform.Find("Mesh/HandlePivot");
             if (pivot == null)
             {
-                throw new InvalidOperationException("RakeTrapPrefab is missing transform path Mesh/HandlePivot");
+                throw new InvalidOperationException($"{prefabName} is missing transform path Mesh/HandlePivot");
             }
 
             for (float angle = ArmedHandleAngle; angle <= SprungHandleAngle; angle += 15f)
@@ -404,7 +465,7 @@ public static class BuildRakeTrapBundle
                 Debug.Log($"Spring clearance angle={angle}, minY={bounds.min.y}, size={bounds.size}");
                 if (bounds.min.y < -0.005f)
                 {
-                    throw new InvalidOperationException($"RakeTrapPrefab dips below ground during spring at angle {angle}: minY={bounds.min.y}");
+                    throw new InvalidOperationException($"{prefabName} dips below ground during spring at angle {angle}: minY={bounds.min.y}");
                 }
             }
         }
@@ -448,6 +509,19 @@ public static class BuildRakeTrapBundle
             material.SetFloat("_BumpScale", 1f);
         }
 
+        EditorUtility.SetDirty(material);
+        return material;
+    }
+
+    private static Material LoadSourceMaterial(string materialPath)
+    {
+        Material material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+        if (material == null)
+        {
+            return null;
+        }
+
+        material.shader = Shader.Find("Standard");
         EditorUtility.SetDirty(material);
         return material;
     }
@@ -590,12 +664,15 @@ public static class BuildRakeTrapBundle
         }
     }
 
-    private static void AssertTransform(Transform root, string path)
+    private static Transform RequireTransform(Transform root, string prefabName, string path)
     {
-        if (root.Find(path) == null)
+        Transform transform = root.Find(path);
+        if (transform == null)
         {
-            throw new InvalidOperationException($"RakeTrapPrefab is missing transform path {path}");
+            throw new InvalidOperationException($"{prefabName} is missing transform path {path}");
         }
+
+        return transform;
     }
 
     private static void DumpTransformTree(Transform root, Transform current, int depth)

@@ -51,6 +51,58 @@
 			<property name="BlockTag" value="Spike" />
 			<property name="FilterTags" value="MC_building,SC_traps" />
 		</block>
+		<block name="upgradedRakeTrap">
+			<property name="Class" value="RakeTrap.BlockRakeTrap, RakeTrap" />
+			<property name="DisplayType" value="blockHardened" />
+			<property name="CustomIcon" value="trapSpikesWoodMaster" />
+			<property name="DescriptionKey" value="upgradedRakeTrapDesc" />
+			<property name="Material" value="MtrapSpikesWood" />
+			<property name="Shape" value="ModelEntity" />
+			<property name="Model" value="#@modfolder:Resources/raketrap.unity3d?UpgradedRakeTrapPrefab.prefab" />
+			<property name="ModelOffset" value="0,0,0" />
+			<property name="GndAlign" value="1" />
+			<property name="OversizedBounds" value="(-0.5,0,-1.25),(1,1.5,2)" />
+			<property name="ImposterExclude" value="true" />
+			<property name="LightOpacity" value="0" />
+			<property name="WaterFlow" value="permitted" />
+			<property name="Place" value="TowardsPlacerInverted" />
+			<property name="OnlySimpleRotations" value="true" />
+			<property name="Collide" value="melee,bullet,arrow,rocket" />
+			<property name="Path" value="solid" />
+			<property name="IsTerrainDecoration" value="true" />
+			<property name="StabilitySupport" value="false" />
+			<property name="StabilityIgnore" value="true" />
+			<property name="ShowModelOnFall" value="false" />
+			<property name="MaxDamage" value="100" />
+			<property name="EconomicValue" value="36" />
+			<property name="EconomicBundleSize" value="10" />
+			<property name="SoundPickup" value="trapwood_grab" />
+			<property name="SoundPlace" value="trapwood_place" />
+			<property name="CanPickup" value="true" param1="upgradedRakeTrap" />
+			<property name="TakeDelay" value="1" />
+			<property name="TriggerSound" value="trap3x3WoodTrigger" />
+			<property name="Damage" value="60" />
+			<property name="DamageType" value="Bashing" />
+			<property name="ArmorPierceFraction" value="0.15" />
+			<property name="KnockdownChance" value="0.9" />
+			<property name="BrushOffChance" value="0.12" />
+			<property name="RearmSeconds" value="4" />
+			<property name="AnimationTrigger" value="Spring" />
+			<property class="RepairItems">
+				<property name="resourceWood" value="10" />
+				<property name="resourceForgedIron" value="2" />
+				<property name="resourceNail" value="4" />
+			</property>
+			<drop event="Destroy" name="resourceWood" count="4,10" />
+			<drop event="Destroy" name="resourceScrapIron" count="1,3" />
+			<drop event="Destroy" name="resourceNail" count="1,2" />
+			<drop event="Fall" count="0" />
+			<property name="SortOrder1" value="B750" />
+			<property name="SortOrder2" value="0011" />
+			<property name="Group" value="Building" />
+			<property name="BlockTag" value="Spike" />
+			<property name="FilterTags" value="MC_building,SC_traps" />
+		</block>
 	</append>
 
 </configs>
